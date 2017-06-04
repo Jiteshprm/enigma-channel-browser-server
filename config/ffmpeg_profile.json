@@ -1,0 +1,57 @@
+{
+  "ffmpeg": {
+    "path": "ffmpeg",
+    "input": "http://192.168.0.37:8001/{service_reference}",
+    "output": "rtmp://127.0.0.1:8081/hls/live",
+    "input_options": [
+      {
+        "option": "-hwaccel",
+        "value": "cuvid"
+      },
+      {
+        "option": "-c:v",
+        "value": "h264_cuvid"
+      },
+      {
+        "option": "-vsync",
+        "value": "0"
+      },
+      {
+        "option": "-hwaccel",
+        "value": "cuvid"
+      }
+    ],
+    "output_options": [
+      {
+        "option": "-vcodec",
+        "value": "h264_nvenc"
+      },
+      {
+        "option": "-ar",
+        "value": "44100"
+      },
+      {
+        "option": "-c:a",
+        "value": "libfdk_aac"
+      },
+      {
+        "option": "-g",
+        "value": "20"
+      },
+      {
+        "option": "-b:v",
+        "value": "1000k"
+      },
+      {
+        "option": "-f",
+        "value": "flv"
+      }
+    ],
+    "process_options": [
+      {
+        "option": "&",
+        "value": ""
+      }
+    ]
+  }
+}
