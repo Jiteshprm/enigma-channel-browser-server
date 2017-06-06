@@ -37,7 +37,7 @@ app.config.from_object('config.default')
 def enigma_get_phases():
     responsejson={
         'ALL_BOUQUETS':'/api/enigma-get-all-bouquets',
-        'ALL_SERVICES_IN_BOUQUET': 'api/enigma-get-all-services-in-bouquet',
+        'ALL_SERVICES_IN_BOUQUET': '/api/enigma-get-all-services-in-bouquet',
         'SELECT_SERVICE': '/api/enigma-select-service',
         'RUN_SERVICE': '/api/enigma-run-service'
     }
