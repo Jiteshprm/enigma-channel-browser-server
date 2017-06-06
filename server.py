@@ -33,12 +33,71 @@ app.config.from_object('config.default')
 #app.config.from_envvar('APP_CONFIG_FILE')
 
 
+@app.route('/api/enigma-get-phases', methods=['GET', 'POST'])
+def enigma_get_phases():
+    responsejson={
+        'ALL_BOUQUETS':'/api/enigma-get-all-bouquets',
+        'ALL_SERVICES_IN_BOUQUET': 'api/enigma-get-all-services-in-bouquet',
+        'SELECT_SERVICE': '/api/enigma-select-service',
+        'RUN_SERVICE': '/api/enigma-run-service'
+    }
+    return JSONResponse(responsejson)
+
+
+@app.route('/api/enigma-get-all-bouquets', methods=['GET', 'POST'])
+def enigma_get_all_bouquets():
+    url=str(app.config.get('ENIGMA_GET_ALL_BOUQUETS')).format(ENIGMA_IP=str(app.config.get('ENIGMA_IP')))
+    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_BOUQUETS')
+    return JSONResponse(responsejson)
+
+
+@app.route('/api/enigma-get-all-services-in-bouquet', methods=['GET', 'POST'])
+def enigma_get_all_services_in_bouquet():
+    service_name = request.args.get('service_name')
+    service_reference = request.args.get('service_reference')
+
+    print "Selected Service Name: " + service_name
+    print "Selected Service Reference: " + service_reference
+    url = str(app.config.get("ENIGMA_GET_SERVICES_IN_BOUQUET")).format(
+        ENIGMA_IP=str(app.config.get("ENIGMA_IP")),
+        service_reference=service_reference
+    )
+    print url
+    print urllib2.quote(url, ':/?')
+    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_SERVICES_IN_BOUQUET')
+    return JSONResponse(responsejson)
+
+
+@app.route('/api/enigma-select-service', methods=['GET', 'POST'])
+def enigma_select_service():
+    service_name = request.args.get('service_name')
+    service_reference = request.args.get('service_reference')
+
+    print "Selected Service Name: " + service_name
+    print "Selected Service Reference: " + service_reference
+
+    ffmpeg_string = generate_ffmpeg_run_command().format(service_reference=service_reference)
+
+    shutil.copy2(app.config.get("FFMPEG_RUN_SCRIPT_TEMPLATE_NAME"), app.config.get("FFMPEG_RUN_SCRIPT_NAME"))
+    f = open(app.config.get("FFMPEG_RUN_SCRIPT_NAME"), 'a')
+    f.write("#Transcoding Channel: {channel}\n".format(channel=service_name))
+    f.write(ffmpeg_string)
+    f.close()
+
+    responsejson = create_json_with_phase_and_payload('SELECT_SERVICE','OK')
+    return JSONResponse(responsejson)
+
+
+
+
+
+
+
+
 @app.route('/api/enigma-get-all-services', methods=['GET', 'POST'])
 def enigma_get_all_services():
     url=str(app.config.get("ENIGMA_GET_ALL_SERVICES")).format(ENIGMA_IP=str(app.config.get("ENIGMA_IP")))
-    response = urllib2.urlopen(url)
-    html = response.read()
-    responsejson = xmltodict.parse(html)
+    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_SERVICES')
     return JSONResponse(responsejson)
 
 
@@ -108,6 +167,21 @@ def JSONResponse(response_string):
     )
 
 
+def get_services_xml_as_json_with_payload_and_phase(url, phase):
+    response = urllib2.urlopen(urllib2.quote(url,':/?'))
+    html = response.read()
+    json_all_services = xmltodict.parse(html)
+    responsejson = create_json_with_phase_and_payload(phase, json_all_services)
+    return responsejson
+
+
+def create_json_with_phase_and_payload(phase, payload):
+    responsejson = dict()
+    responsejson['phase'] = phase
+    responsejson['payload'] = payload
+    return responsejson
+
+
 def generate_ffmpeg_run_command():
     config_file = open('config/ffmpeg_profile.json', 'r')
     config_file_string = config_file.read()
@@ -122,27 +196,26 @@ def generate_ffmpeg_run_command():
 
     ffmpeg_run_string = "{ffmpeg_path} {ffmpeg_input_options} -i {ffmpeg_input_file} {ffmpeg_output_options} {ffmpeg_output_file} {ffmpeg_process_options}" \
         .format(
-        ffmpeg_path=ffmpeg_path,
-        ffmpeg_input_options=ffmpeg_input_options,
-        ffmpeg_input_file=ffmpeg_input_file,
-        ffmpeg_output_options=ffmpeg_output_options,
-        ffmpeg_output_file=ffmpeg_output_file,
-        ffmpeg_process_options=ffmpeg_process_options
-    )
+            ffmpeg_path=ffmpeg_path,
+            ffmpeg_input_options=ffmpeg_input_options,
+            ffmpeg_input_file=ffmpeg_input_file,
+            ffmpeg_output_options=ffmpeg_output_options,
+            ffmpeg_output_file=ffmpeg_output_file,
+            ffmpeg_process_options=ffmpeg_process_options
+        )
     return ffmpeg_run_string
 
 
 def ffmpeg_parse_options(ffmpeg_config_params, ffmpeg_json_options_name):
-    ffmpeg_packed_options = [Ffmpeg_options(**k) for k in
-                                   ffmpeg_config_params["ffmpeg"][ffmpeg_json_options_name]]
+    ffmpeg_packed_options = [Ffmpeg_options(**k) for k in ffmpeg_config_params["ffmpeg"][ffmpeg_json_options_name]]
     ffmpeg_input_options = ""
     for an_input_option in ffmpeg_packed_options:
         ffmpeg_input_options = "{ffmpeg_options} {one_option} {one_option_value}" \
             .format(
-            ffmpeg_options=ffmpeg_input_options,
-            one_option=an_input_option.option,
-            one_option_value=an_input_option.value
-        ).strip()
+                ffmpeg_options=ffmpeg_input_options,
+                one_option=an_input_option.option,
+                one_option_value=an_input_option.value
+            ).strip()
     return ffmpeg_input_options
 
 
