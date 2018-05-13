@@ -35,19 +35,20 @@ app.config.from_object('config.default')
 
 @app.route('/api/enigma-get-phases', methods=['GET', 'POST'])
 def enigma_get_phases():
-    responsejson={
-        'ALL_BOUQUETS':'/api/enigma-get-all-bouquets',
-        'ALL_SERVICES_IN_BOUQUET': '/api/enigma-get-all-services-in-bouquet',
-        'SELECT_SERVICE': '/api/enigma-select-service',
-        'RUN_SERVICE': '/api/enigma-run-service'
-    }
+    responsejson= ({"phases":[
+        {"phase":'ALL_BOUQUETS', "url":'http://127.0.0.1:3001/api/enigma-get-all-bouquets'},
+        {"phase":'ALL_SERVICES_IN_BOUQUET', "url": 'http://127.0.0.1:3001/api/enigma-get-all-services-in-bouquet?service_reference=${service_reference}&service_name=${service_name}'},
+        {"phase":'SELECT_SERVICE', "url": 'http://127.0.0.1:3001/api/enigma-select-service?service_reference=${service_reference}&service_name=${service_name}'},
+        {"phase":'RUN_SERVICE', "url": 'http://127.0.0.1:3001/api/enigma-run-ffmpeg'},
+        {"phase": 'ALL_SERVICES_IN_BOUQUET', "url": 'http://127.0.0.1:3001/api/enigma-get-all-services-in-bouquet?service_reference=${service_reference}&service_name=${service_name}'}
+    ]})
     return JSONResponse(responsejson)
 
 
 @app.route('/api/enigma-get-all-bouquets', methods=['GET', 'POST'])
 def enigma_get_all_bouquets():
     url=str(app.config.get('ENIGMA_GET_ALL_BOUQUETS')).format(ENIGMA_IP=str(app.config.get('ENIGMA_IP')))
-    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_BOUQUETS')
+    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_BOUQUETS', "", "")
     return JSONResponse(responsejson)
 
 
@@ -63,8 +64,8 @@ def enigma_get_all_services_in_bouquet():
         service_reference=service_reference
     )
     print url
-    print urllib2.quote(url, ':/?')
-    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_SERVICES_IN_BOUQUET')
+    print urllib2.quote(url, ':/?=')
+    responsejson = get_services_xml_as_json_with_payload_and_phase(url, 'ALL_SERVICES_IN_BOUQUET',service_reference, service_name)
     return JSONResponse(responsejson)
 
 
@@ -84,7 +85,8 @@ def enigma_select_service():
     f.write(ffmpeg_string)
     f.close()
 
-    responsejson = create_json_with_phase_and_payload('SELECT_SERVICE','OK')
+    responsetext = "OK - Running <br> {ffmpeg_string}".format(ffmpeg_string=ffmpeg_string)
+    responsejson = create_json_with_phase_and_payload('SELECT_SERVICE',responsetext,service_reference,service_name)
     return JSONResponse(responsejson)
 
 
@@ -121,7 +123,7 @@ def enigma_service_selector():
         responsejson = xmltodict.parse(html)
     else:
         ffmpeg_string=generate_ffmpeg_run_command().format(service_reference = service_reference)
-        responsejson="OK"
+        responsejson="OK - Running <br> {ffmpeg_string}".format(ffmpeg_string=ffmpeg_string)
 
         shutil.copy2(app.config.get("FFMPEG_RUN_SCRIPT_TEMPLATE_NAME"), app.config.get("FFMPEG_RUN_SCRIPT_NAME"))
         f = open(app.config.get("FFMPEG_RUN_SCRIPT_NAME"), 'a')
@@ -137,8 +139,9 @@ def enigma_run_ffmpeg():
     #subprocess.call(['chmod +x /Users/jitesh/PycharmProjects/enigma-channel-browser-server/run_ffmpeg_transcode.sh'])
     run_script_command="./{script}".format(script=app.config.get("FFMPEG_RUN_SCRIPT_NAME"))
     subprocess.call([run_script_command])
-    response="OK"
-    return JSONResponse(response)
+    response="Running"
+    response_json=create_json_with_phase_and_payload("RUN_FFMPEG", response, "", "")
+    return JSONResponse(response_json)
 
 
 @app.route('/api/enigma-get-config', methods=['GET', 'POST'])
@@ -167,18 +170,21 @@ def JSONResponse(response_string):
     )
 
 
-def get_services_xml_as_json_with_payload_and_phase(url, phase):
-    response = urllib2.urlopen(urllib2.quote(url,':/?'))
+def get_services_xml_as_json_with_payload_and_phase(url, phase,service_reference,service_name):
+    response = urllib2.urlopen(urllib2.quote(url,':/?='))
     html = response.read()
     json_all_services = xmltodict.parse(html)
-    responsejson = create_json_with_phase_and_payload(phase, json_all_services)
+    #print "json_all_services: " + html
+    responsejson = create_json_with_phase_and_payload(phase, json_all_services,service_reference,service_name)
     return responsejson
 
 
-def create_json_with_phase_and_payload(phase, payload):
+def create_json_with_phase_and_payload(phase, payload, service_reference, service_name):
     responsejson = dict()
     responsejson['phase'] = phase
     responsejson['payload'] = payload
+    responsejson['service_reference'] = service_reference
+    responsejson['service_name'] = service_name
     return responsejson
 
 
