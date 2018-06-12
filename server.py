@@ -81,7 +81,7 @@ def enigma_select_service():
 
     shutil.copy2(app.config.get("FFMPEG_RUN_SCRIPT_TEMPLATE_NAME"), app.config.get("FFMPEG_RUN_SCRIPT_NAME"))
     f = open(app.config.get("FFMPEG_RUN_SCRIPT_NAME"), 'a')
-    f.write("#Transcoding Channel: {channel}\n".format(channel=service_name))
+    f.write("#Transcoding Channel: {channel}\n".format(channel=service_name.encode("utf-8")))
     f.write(ffmpeg_string)
     f.close()
 
